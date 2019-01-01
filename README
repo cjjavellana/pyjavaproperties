@@ -9,12 +9,13 @@ pyjavaproperties
 About
 ------------------
 
-This is a "fork" of the "python replacement for java.util.Properties" recipe
-on ASPN: <http://code.activestate.com/recipes/496795/> and uploaded by 
-Anand Balachandran Pillai. 
+Created as a "python replacement for java.util.Properties"
+and uploaded on ASPN: <http://code.activestate.com/recipes/496795/> by Anand Balachandran Pillai.
 
-The project is maintained by Jesse Noller <jnoller@gmail.com>, Anand Pilla
-<abpillai@gmail.com>.
+Forked by Jesse Noller <jnoller@gmail.com> to introduce new features and fixes. Hosted
+at <http://bitbucket.org/jnoller/pyjavaproperties/>.
+
+Forked by Christian Javellana <cjjavellana@gmail.com> to add support to decrypt AES encrypted property values.
 
 License
 ------------------
@@ -75,6 +76,9 @@ property keys
 
 Changes & News
 --------------
+0.7:
+    - Added support to decrypt encrypted values
+
 0.6: 
     - Fix license, whitespace.
 

@@ -7,12 +7,30 @@ Created - Pepper Lebeck-Jobe (eljobe@gmail.com)
 
 import os
 import unittest
+import tempfile
+import requests
+
 from io import BytesIO
 from StringIO import StringIO
-import tempfile
+from mock import mock
 
 from pyjavaproperties import Properties
 
+test_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'testdata')
+properties_file = os.path.join(test_dir, 'complex.properties')
+
+
+def mocked_requests_get(*args, **kwargs):
+  class MockTextResponse:
+    def __init__(self, text_data, status_code):
+      self.text = text_data
+      self.status_code = status_code
+
+  if args[0] == 'http://someurl.com/complex.properties':
+    with open(properties_file) as f:
+      return MockTextResponse(f.read(), 200)
+
+  return MockTextResponse(None, 404)
 
 class PyJavaPropertiesTest(unittest.TestCase):
   """Tests pyjavaproperties complies to java.util.Properties contract."""
@@ -20,11 +38,12 @@ class PyJavaPropertiesTest(unittest.TestCase):
   def setUp(self):
     test_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'testdata')
     self.properties_file = os.path.join(test_dir, 'complex.properties')
+    os.environ['PYJAVA_AES_KEY'] = "aabbccddeeffgghh"
 
   def _testParsePropertiesInput(self, stream):
     properties = Properties()
     properties.load(stream)
-    self.assertEquals(23, len(properties.items()))
+    self.assertEquals(24, len(properties.items()))
     self.assertEquals('Value00', properties['Key00'])
     self.assertEquals('Value01', properties['Key01'])
     self.assertEquals('Value02', properties['Key02'])
@@ -52,6 +71,7 @@ class PyJavaPropertiesTest(unittest.TestCase):
     self.assertEquals('Value20', properties['Key20=WithEquals'])
     self.assertEquals('Value21', properties['Key21:WithColon'])
     self.assertEquals('Value22', properties['Key22'])
+    self.assertEquals('aaabbbccc111222333', properties['Key23'])
 
   def testParsePropertiesInputFile(self):
     with open(self.properties_file) as f:
@@ -107,6 +127,13 @@ class PyJavaPropertiesTest(unittest.TestCase):
   def testParsePropertiesOutputStringIO(self):
     stream = StringIO()
     self._testParsePropertiesOutput(stream)
+
+  @mock.patch('requests.get', side_effect=mocked_requests_get)
+  def testLoadWebProperties(self, mock_get):
+    web_props = requests.get("http://someurl.com/complex.properties")
+    stream = StringIO(web_props.text)
+    self._testParsePropertiesInput(stream)
+
 
 if __name__ == '__main__':
   unittest.main()

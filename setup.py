@@ -1,5 +1,5 @@
 import os
-import sys
+
 try:
     import ez_setup
     ez_setup.use_setuptools()
@@ -15,14 +15,13 @@ f.close()
 
 setup(
     name='pyjavaproperties',
-    version='0.6',
-    author='Jesse Noller',
-    author_email = 'jnoller@gmail.com',
-    description = 'Python replacement for java.util.Properties.',
-    long_description = long_description,
+    version='0.7',
+    author='Christian Javellana',
+    author_email='cjjavellana@gmail.com',
+    description='Python replacement for java.util.Properties.',
+    long_description=long_description,
     url='http://pypi.python.org/pypi/pyjavaproperties',
-    license = 'PSF License',
-      classifiers=[
+    license='PSF License', classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: Apache Software License',
@@ -30,6 +29,6 @@ setup(
         'Topic :: Software Development :: Libraries :: Python Modules',
       ],
     py_modules=['pyjavaproperties'],
-    packages=[''],
+    packages=[],
     package_dir={'': '.'},
     )

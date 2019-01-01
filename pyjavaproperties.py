@@ -7,9 +7,12 @@ This is modelled as closely as possible to the Java original.
 Created - Anand B Pillai <abpillai@gmail.com>
 """
 
-import sys,os
+import sys, os
 import re
 import time
+from crypto import AESCipher
+
+ENCRYPTED_STRING_START_INDEX = 5
 
 class IllegalArgumentException(Exception):
 
@@ -18,8 +21,9 @@ class IllegalArgumentException(Exception):
         self.msg = msg
 
     def __str__(self):
-        s='Exception at line number %d => %s' % (self.lineno, self.msg)
+        s = 'Exception at line number %d => %s' % (self.lineno, self.msg)
         return s
+
 
 class Properties(object):
     """ A Python replacement for java.util.Properties """
@@ -44,12 +48,15 @@ class Properties(object):
         self.othercharre2 = re.compile(r'(\s*\=)|(\s*\:)')
         self.bspacere = re.compile(r'\\(?!\s$)')
 
-    def __str__(self):
-        s='{'
-        for key,value in self._props.items():
-            s = ''.join((s,key,'=',value,', '))
+        aes_key = os.environ.get('PYJAVA_AES_KEY', None)
+        self.aes_cipher = AESCipher(aes_key)
 
-        s=''.join((s[:-2],'}'))
+    def __str__(self):
+        s = '{'
+        for key, value in self._props.items():
+            s = ''.join((s, key, '=', value, ', '))
+
+        s = ''.join((s[:-2], '}'))
         return s
 
     def __parse(self, lines):
@@ -88,18 +95,22 @@ class Properties(object):
         # This is a line parser. It parses the
         # contents like by line.
 
-        lineno=0
+        lineno = 0
         i = iter(lines)
 
         for line in i:
             lineno += 1
             line = line.strip()
             # Skip null lines
-            if not line: continue
+            if not line:
+                continue
+
             # Skip lines which are comments
-            if line[0] in ('#','!'): continue
+            if line[0] in ('#', '!'):
+                continue
+
             # Some flags
-            escaped=False
+            escaped = False
             # Position of first separation char
             sepidx = -1
             # A flag for performing wspace re check
@@ -139,7 +150,6 @@ class Properties(object):
                 sepidx = last - 1
                 # print line[sepidx]
 
-
             # If the last character is a backslash
             # it has to be preceded by a space in which
             # case the next line is read as part of the
@@ -154,14 +164,20 @@ class Properties(object):
 
             # Now split to key,value according to separation char
             if sepidx != -1:
-                key, value = line[:sepidx], line[sepidx+1:]
+                key, value = line[:sepidx], line[sepidx + 1:]
             else:
-                key,value = line,''
+                key, value = line, ''
             self._keyorder.append(key)
             self.processPair(key, value)
 
     def processPair(self, key, value):
         """ Process a (key, value) pair """
+
+        # Check if we have to decrypt the value
+        if value.lower().startswith("[enc]"):
+            # Check whether decryption key is provided
+            encrypted = value[ENCRYPTED_STRING_START_INDEX:len(value)]
+            value = self.aes_cipher.decrypt(encrypted)
 
         oldkey = key
         oldvalue = value
@@ -174,7 +190,7 @@ class Properties(object):
         lastpart = keyparts[-1]
 
         if lastpart.find('\\ ') != -1:
-            keyparts[-1] = lastpart.replace('\\','')
+            keyparts[-1] = lastpart.replace('\\', '')
 
         # If no backspace is found at the end, but empty
         # space is found, strip it
@@ -194,14 +210,14 @@ class Properties(object):
         found = curlies.findall(value)
 
         for f in found:
-            srcKey = f[1:-1]
-            if self._props.has_key(srcKey):
-                value = value.replace(f, self._props[srcKey], 1)
+            src_key = f[1:-1]
+            if src_key in self._props:
+                value = value.replace(f, self._props[src_key], 1)
 
         self._props[key] = value.strip()
 
         # Check if an entry exists in pristine keys
-        if self._keymap.has_key(key):
+        if key in self._keymap:
             oldkey = self._keymap.get(key)
             self._origprops[oldkey] = oldvalue.strip()
         else:
@@ -217,16 +233,16 @@ class Properties(object):
         # Java escapes the '=' and ':' in the value
         # string with backslashes in the store method.
         # So let us do the same.
-        newvalue = value.replace(':','\:')
-        newvalue = newvalue.replace('=','\=')
+        newvalue = value.replace(':', '\:')
+        newvalue = newvalue.replace('=', '\=')
 
         return newvalue
 
     def unescape(self, value):
 
         # Reverse of escape
-        newvalue = value.replace('\:',':')
-        newvalue = newvalue.replace('\=','=')
+        newvalue = value.replace('\:', ':')
+        newvalue = newvalue.replace('\=', '=')
 
         return newvalue
 
@@ -235,9 +251,9 @@ class Properties(object):
 
         if type(stream) is file:
             if stream.mode != 'r':
-                raise ValueError,'Stream should be opened in read-only mode!'
+                raise ValueError, 'Stream should be opened in read-only mode!'
         elif not hasattr(stream, 'read'):
-            raise TypeError,'Argument should be a file-like object!'
+            raise TypeError, 'Argument should be a file-like object!'
 
         try:
             lines = stream.readlines()
@@ -248,7 +264,7 @@ class Properties(object):
     def getProperty(self, key):
         """ Return a property for the given key """
 
-        return self._props.get(key,'')
+        return self._props.get(key, '')
 
     def setProperty(self, key, value):
         """ Set the property for the given key """
@@ -256,7 +272,7 @@ class Properties(object):
         if type(key) is str and type(value) is str:
             self.processPair(key, value)
         else:
-            raise TypeError,'both key and value should be strings!'
+            raise TypeError, 'both key and value should be strings!'
 
     def propertyNames(self):
         """ Return an iterator over all the keys of the property
@@ -269,8 +285,8 @@ class Properties(object):
         stream 'out' which defaults to the standard output """
 
         out.write('-- listing properties --\n')
-        for key,value in self._props.items():
-            out.write(''.join((key,'=',value,'\n')))
+        for key, value in self._props.items():
+            out.write(''.join((key, '=', value, '\n')))
 
     def store(self, out, header=""):
         """ Write the properties list to the stream 'out' along
@@ -278,20 +294,20 @@ class Properties(object):
 
         if type(out) is file:
             if out.mode[0] != 'w':
-                raise ValueError,'Stream should be opened in write mode!'
+                raise ValueError, 'Stream should be opened in write mode!'
         elif not hasattr(out, 'write'):
-            raise TypeError,'Stream should be file-like!'
+            raise TypeError, 'Stream should be file-like!'
 
         try:
-            out.write(''.join(('#',header,'\n')))
+            out.write(''.join(('#', header, '\n')))
             # Write timestamp
             tstamp = time.strftime('%a %b %d %H:%M:%S %Z %Y', time.localtime())
-            out.write(''.join(('#',tstamp,'\n')))
+            out.write(''.join(('#', tstamp, '\n')))
             # Write properties from the pristine dictionary
             for prop in self._keyorder:
                 if prop in self._origprops:
                     val = self._origprops[prop]
-                    out.write(''.join((prop,'=',self.escape(val),'\n')))
+                    out.write(''.join((prop, '=', self.escape(val), '\n')))
         except IOError, e:
             raise
 
@@ -315,12 +331,13 @@ class Properties(object):
         try:
             return self.__dict__[name]
         except KeyError:
-            if hasattr(self._props,name):
+            if hasattr(self._props, name):
                 return getattr(self._props, name)
 
-if __name__=="__main__":
+
+if __name__ == "__main__":
     p = Properties()
-    p.load(open('test2.properties'))
+    p.load(open('testdata/complex.properties'))
     p.list()
     print p
     print p.items()
@@ -328,4 +345,4 @@ if __name__=="__main__":
     p['name3'] = 'changed = value'
     print p['name3']
     p['new key'] = 'new value'
-    p.store(open('test2.properties','w'))
+    p.store(open('testdata/test2.properties', 'w'))
